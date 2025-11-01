@@ -26,6 +26,8 @@ local ROLE_MENTIONS = {
     ["300m"] = "<@&1434199612998160384>"
 }
 
+local HIGHLIGHT_WEBHOOK = "https://discord.com/api/webhooks/1434181937903435949/coD1tc4C9FJ5LdHkVX2SkZ4p4FWYxEWmSfqomb4uPlFOxx80FfqNh-6CDv8SJJ9vi4Mg" 
+
 -- LOGGING
 local function log(level, msg)
     print(string.format("[%s][%s] %s", os.date("%H:%M:%S"), string.upper(level), msg))
@@ -58,7 +60,7 @@ local function determineTier(value)
     end
 end
 
--- WEBHOOK (✅ actualizado para mostrar hora como un webhook normal)
+-- ENVÍO A WEBHOOK NORMAL
 local function sendToWebhook(name, gen)
     local value = parseGeneration(gen)
     local tier = determineTier(value)
@@ -68,7 +70,6 @@ local function sendToWebhook(name, gen)
     local mention = ROLE_MENTIONS[tier]
     if not webhookUrl then return end
 
-    -- Discord mostrará la hora automáticamente usando este timestamp
     local timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ")
 
     local embed = {
@@ -81,7 +82,7 @@ local function sendToWebhook(name, gen)
             { name = "Job ID", value = "```" .. game.JobId .. "```" }
         },
         footer = { text = "© Alpha - Notifier" },
-        timestamp = timestamp -- 🕒 Muestra hora automáticamente en el embed
+        timestamp = timestamp
     }
 
     local payload = { content = mention, embeds = {embed} }
@@ -90,6 +91,36 @@ local function sendToWebhook(name, gen)
     if request then
         request({
             Url = webhookUrl,
+            Method = "POST",
+            Headers = { ["Content-Type"] = "application/json" },
+            Body = HttpService:JSONEncode(payload)
+        })
+    end
+
+    -- Si es 50m o superior → también al webhook highlight
+    if tier == "50m" or tier == "100m" or tier == "300m" then
+        sendToHighlights(name, gen)
+    end
+end
+
+-- NUEVO: ENVÍO A HIGHLIGHT
+function sendToHighlights(name, gen)
+    local timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ")
+
+    local embed = {
+        title = "🌟 Highlight Detectado",
+        description = string.format("**%s** — 💰 **%s**", name, gen),
+        color = 16766720, -- Amarillo dorado
+        footer = { text = "Alpha Highlights" },
+        timestamp = timestamp
+    }
+
+    local payload = { embeds = {embed} }
+
+    local request = http_request or request or (syn and syn.request) or (fluxus and fluxus.request)
+    if request then
+        request({
+            Url = HIGHLIGHT_WEBHOOK,
             Method = "POST",
             Headers = { ["Content-Type"] = "application/json" },
             Body = HttpService:JSONEncode(payload)
@@ -133,7 +164,7 @@ local function scanPlots()
 end
 
 -- SERVER HOP
-local API_URL = "https://web-production-219c3.up.railway.app/get-server"
+local API_URL = ""
 local PLACE_ID = 109983668079237
 local attempt = 0
 
