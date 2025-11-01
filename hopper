@@ -133,7 +133,7 @@ local function scanPlots()
 end
 
 -- SERVER HOP
-local API_URL = ""
+local API_URL = "https://web-production-219c3.up.railway.app/get-server"
 local PLACE_ID = 109983668079237
 local attempt = 0
 
