@@ -8,185 +8,79 @@ local TeleportService = game:GetService("TeleportService")
 local Player = Players.LocalPlayer
 
 -- CONFIG
-local SCAN_DURATION = 10
-local SCAN_INTERVAL = 0.1
-local MAX_HOP_ATTEMPTS = 9999
-
-local WEBHOOK_URLS = {
-    ["10m"] = "https://discord.com/api/webhooks/1433559491932327946/3ZJwQPWwLtFVlnuR46zo4LueBkqpF7d2RDAqj5bSLIxyItDv-QuOzDJL67fyNa5xFzIn",
-    ["50m"] = "https://discord.com/api/webhooks/1433888009350152363/NLk4k9Blzj3ckGELHDvyLGrMRSg8Yal_vneQpfigQfZAEPw0HlmhqyLFanDjHRlVzoAx",
-    ["100m"] = "https://discord.com/api/webhooks/1433888165474603169/be7HOrAcDlUpk9dEM5HRL0NMm8bM51Qh7xptKPryZzvkMs_XXM-cWYed-eYzGuKoEB9U",
-    ["300m"] = "https://discord.com/api/webhooks/1433888306130845887/m9hQ0opNhqJY5gtx965bZcM2uCAXc25z5YJeedKxjCdkLm18it6POBjOAqRCHMka7yGP"
-}
-
-local ROLE_MENTIONS = {
-    ["10m"] = "<@&1434198769045340433>",
-    ["50m"] = "<@&1434198840369742008>",
-    ["100m"] = "<@&1434199550570004650>",
-    ["300m"] = "<@&1434199612998160384>"
-}
-
-local HIGHLIGHT_WEBHOOK = "https://discord.com/api/webhooks/1434181937903435949/coD1tc4C9FJ5LdHkVX2SkZ4p4FWYxEWmSfqomb4uPlFOxx80FfqNh-6CDv8SJJ9vi4Mg"
-
-local SPECIAL_BRAINROTS = {
-    ["Strawberry Elephant"] = true,
-    ["Dragon Cannelloni"] = true,
-    ["Garama and Madundung"] = true,
-    ["La Supreme Combinasion"] = true,
-    ["La Secret Combinasion"] = true,
-    ["Ketchuru and Musturu"] = true,
-    ["Tictac Sahur"] = true,
-    ["Tang Tang Keletang"] = true,
-    ["Nuclearo Dinossauro"] = true,
-    ["Ketupat Kepat"] = true,
-    ["Spaghetti Tualetti"] = true,
-    ["Burguro And Fryuro"] = true,
-    ["Spooky and Pumpky"] = true,
-    ["La Casa Boo"] = true,
-    ["Meowl"] = true,
-    ["Money Money Puggy"] = true,
-    ["Headless Horseman"] = true
-}
+local SCAN_DURATION = 5        -- duración del escaneo en segundos
+local SCAN_INTERVAL = 0.1      -- cada cuánto revisar los plots
+local MAX_HOP_ATTEMPTS = 9999  -- máximo de intentos de server hop
+local API_URL_ADD = "https://webhooks-production-f2d6.up.railway.app/add-server"
+local API_URL_GET = "https://web-production-219c3.up.railway.app/get-server"
+local PLACE_ID = game.PlaceId   -- ID del juego actual
 
 -- LOGGING
 local function log(level, msg)
     print(string.format("[%s][%s] %s", os.date("%H:%M:%S"), string.upper(level), msg))
 end
 
--- PARSE MONEY/S
+-- PARSE GENERATION
 local function parseGeneration(genStr)
     if not genStr then return 0 end
     genStr = string.gsub(genStr, "[%$,/s]", "")
     genStr = string.upper(genStr)
     local number, suffix = string.match(genStr, "([%d%.]+)([KMB]?)")
     number = tonumber(number) or 0
-    if suffix == "K" then number *= 1e3
-    elseif suffix == "M" then number *= 1e6
-    elseif suffix == "B" then number *= 1e9 end
+    if suffix=="K" then number*=1e3
+    elseif suffix=="M" then number*=1e6
+    elseif suffix=="B" then number*=1e9 end
     return number
 end
 
 local function determineTier(value)
-    if value >= 10000000 and value < 50000000 then
-        return "10m"
-    elseif value >= 50000000 and value < 100000000 then
-        return "50m"
-    elseif value >= 100000000 and value < 300000000 then
-        return "100m"
-    elseif value >= 300000000 then
-        return "300m"
-    else
-        return nil
+    if value >= 1e7 and value < 5e7 then return "10m"
+    elseif value >= 5e7 and value < 1e8 then return "50m"
+    elseif value >= 1e8 and value < 3e8 then return "100m"
+    elseif value >= 3e8 then return "300m"
+    else return nil
     end
 end
 
--- ENVÍO A WEBHOOK AGRUPADO
-local function sendGroupedWebhook(tier, brainrots)
-    if #brainrots == 0 then return end
-
-    table.sort(brainrots, function(a, b)
-        return a.value > b.value
-    end)
-
-    local lines = {}
-    table.insert(lines, string.format("```%s```", game.JobId))
-    table.insert(lines, "")
-
-    for i, b in ipairs(brainrots) do
-        local formatted = string.format("**%s — %s**", b.name, b.gen)
-        if i == 1 then
-            formatted = string.format("🥇 **__%s — %s__**", b.name, b.gen)
-        end
-        table.insert(lines, formatted)
-    end
-
-    table.insert(lines, "")
-    table.insert(lines, string.format("👥 **Jugadores:** %s", #Players:GetPlayers()))
-
-    local embed = {
-        title = "⚡ Alpha - Notifier",
-        description = table.concat(lines, "\n"),
-        color = 16711680,
-        footer = { text = "© Alpha - Notifier" },
-        timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ")
-    }
-
-    local payload = { content = ROLE_MENTIONS[tier], embeds = {embed} }
-
-    local request = http_request or request or (syn and syn.request) or (fluxus and fluxus.request)
-    if request then
-        request({
-            Url = WEBHOOK_URLS[tier],
-            Method = "POST",
-            Headers = { ["Content-Type"] = "application/json" },
-            Body = HttpService:JSONEncode(payload)
-        })
-    end
+-- ENVÍO A API
+local function SendToAPI(data)
+    local req = http_request or request or (syn and syn.request) or (fluxus and fluxus.request)
+    if not req then return end
+    local body = HttpService:JSONEncode(data)
+    req({
+        Url = API_URL_ADD,
+        Method = "POST",
+        Headers = { ["Content-Type"]="application/json" },
+        Body = body
+    })
+    print("[SCANNER] Enviado a API con "..#data.brainrots.." brainrots y "..data.players.." players")
 end
 
--- ENVÍO A HIGHLIGHT AGRUPADO
-local function sendGroupedHighlights(brainrots)
-    if #brainrots == 0 then return end
-    table.sort(brainrots, function(a, b) return a.value > b.value end)
-    local top = brainrots[1]
-
-    local lines = {}
-    for _, b in ipairs(brainrots) do
-        table.insert(lines, string.format("**%s — %s**", b.name, b.gen))
-    end
-
-    local embed = {
-        title = string.format("🌟 %s — %s", top.name, top.gen),
-        description = table.concat(lines, "\n"),
-        color = 16766720,
-        footer = { text = "Alpha Highlights" },
-        timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ")
-    }
-
-    local payload = { embeds = { embed } }
-
-    local request = http_request or request or (syn and syn.request) or (fluxus and fluxus.request)
-    if request then
-        request({
-            Url = HIGHLIGHT_WEBHOOK,
-            Method = "POST",
-            Headers = { ["Content-Type"] = "application/json" },
-            Body = HttpService:JSONEncode(payload)
-        })
-    end
-end
-
--- ESCANEO Y AGRUPACIÓN
+-- ESCANEO
 local function scanPlots()
-    log("info", "🔍 Escaneando plots...")
+    log("info","🔍 Escaneando plots...")
     local startTime = tick()
     local sent = {}
-    local brainrotsByTier = { ["10m"] = {}, ["50m"] = {}, ["100m"] = {}, ["300m"] = {} }
-    local highlightList = {}
+    local brainrotsByTier = { ["10m"]={}, ["50m"]={}, ["100m"]={}, ["300m"]={} }
 
-    while tick() - startTime < SCAN_DURATION do
+    while tick()-startTime < SCAN_DURATION do
         local plots = Workspace:FindFirstChild("Plots")
         if plots then
-            for _, desc in ipairs(plots:GetDescendants()) do
-                if desc.Name == "AnimalOverhead" then
+            for _,desc in ipairs(plots:GetDescendants()) do
+                if desc.Name=="AnimalOverhead" then
                     local display = desc:FindFirstChild("DisplayName")
                     local generation = desc:FindFirstChild("Generation")
                     if display and generation and display:IsA("TextLabel") and generation:IsA("TextLabel") then
-                        local name = display.Text ~= "" and display.Text or display.ContentText
-                        local gen = generation.Text ~= "" and generation.Text or generation.ContentText
+                        local name = display.Text~="" and display.Text or display.ContentText
+                        local gen = generation.Text~="" and generation.Text or generation.ContentText
                         if name and gen and gen:find("/s") then
-                            local key = name .. "_" .. gen
+                            local key = name.."_"..gen
                             if not sent[key] then
-                                sent[key] = true
+                                sent[key]=true
                                 local value = parseGeneration(gen)
                                 local tier = determineTier(value)
                                 if tier then
-                                    table.insert(brainrotsByTier[tier], { name = name, gen = gen, value = value })
-                                    if tier == "50m" or tier == "100m" or tier == "300m" then
-                                        table.insert(highlightList, { name = name, gen = gen, value = value })
-                                    end
-                                elseif SPECIAL_BRAINROTS[name] then
-                                    table.insert(highlightList, { name = name, gen = gen, value = value })
+                                    table.insert(brainrotsByTier[tier], {tier=tier, name=name, gen=gen, value=value})
                                 end
                             end
                         end
@@ -197,22 +91,36 @@ local function scanPlots()
         task.wait(SCAN_INTERVAL)
     end
 
+    -- Lógica de envío: si hay algo de 300m solo enviar esos
+    local has300 = #brainrotsByTier["300m"] > 0
+    local allBrainrots = {}
+
     for tier, list in pairs(brainrotsByTier) do
-        if #list > 0 then sendGroupedWebhook(tier, list) end
+        for _, b in ipairs(list) do
+            if not has300 or b.tier=="300m" then
+                table.insert(allBrainrots, {tier=b.tier, name=b.name, gen=b.gen, value=b.value})
+            end
+        end
     end
 
-    if #highlightList > 0 then sendGroupedHighlights(highlightList) end
+    if #allBrainrots > 0 then
+        SendToAPI({
+            jobId = game.JobId,
+            players = #Players:GetPlayers(),
+            brainrots = allBrainrots,
+            timestamp = os.time()
+        })
+    else
+        log("info","⚠️ No se detectaron brainrots que enviar")
+    end
 end
 
 -- SERVER HOP
-local API_URL = "https://web-production-219c3.up.railway.app/get-server"
-local PLACE_ID = 109983668079237
 local attempt = 0
-
-local function Parse_JSON(url)
+local function GetJobId()
     local req = http_request or request or (syn and syn.request) or (fluxus and fluxus.request)
     if not req then return nil end
-    local resp = req({Url = url, Method = "GET"})
+    local resp = req({Url = API_URL_GET, Method = "GET"})
     if resp and resp.Body then
         local ok, data = pcall(function() return HttpService:JSONDecode(resp.Body) end)
         if ok and data and data.job_id then return data.job_id end
@@ -223,19 +131,18 @@ end
 local function Teleport_To_Server()
     attempt += 1
     if attempt > MAX_HOP_ATTEMPTS then
-        log("error", "❌ Máximo de intentos de server hop alcanzado.")
+        log("error","❌ Máximo de intentos de server hop alcanzado.")
         return
     end
-
-    log("info", "🌍 Buscando nuevo servidor... (Intento " .. attempt .. ")")
-    local jobId = Parse_JSON(API_URL)
+    log("info","🌍 Buscando nuevo servidor... (Intento "..attempt..")")
+    local jobId = GetJobId()
     if jobId then
-        log("info", "🚀 Teletransportando al JobID: " .. jobId)
+        log("info","🚀 Teletransportando al JobID: "..jobId)
         local ok, err = pcall(function()
             TeleportService:TeleportToPlaceInstance(PLACE_ID, jobId, Player)
         end)
         if not ok then
-            warn("[Error Teleport]: " .. tostring(err))
+            warn("[Error Teleport]: "..tostring(err))
             task.wait(1)
             Teleport_To_Server()
         end
@@ -254,10 +161,10 @@ end)
 
 -- MAIN
 local function main()
-    log("info", "⌛ Esperando 5 segundos antes del escaneo...")
-    task.wait(5)
+    log("info","⌛ Esperando 2 segundos antes del escaneo...")
+    task.wait(2)
     scanPlots()
-    log("info", "🕒 Escaneo terminado, iniciando server hop...")
+    log("info","🕒 Escaneo terminado, iniciando server hop...")
     Teleport_To_Server()
 end
 
