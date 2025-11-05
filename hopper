@@ -38,8 +38,7 @@ local function determineTier(value)
     elseif value >= 5e7 and value < 1e8 then return "50m"
     elseif value >= 1e8 and value < 3e8 then return "100m"
     elseif value >= 3e8 then return "300m"
-    else return nil
-    end
+    else return nil end
 end
 
 -- ENVÍO A API
@@ -61,7 +60,7 @@ local function scanPlots()
     log("info","🔍 Escaneando plots...")
     local startTime = tick()
     local sent = {}
-    local brainrotsByTier = { ["10m"]={}, ["50m"]={}, ["100m"]={}, ["300m"]={} }
+    local allBrainrots = {}
 
     while tick()-startTime < SCAN_DURATION do
         local plots = Workspace:FindFirstChild("Plots")
@@ -80,7 +79,7 @@ local function scanPlots()
                                 local value = parseGeneration(gen)
                                 local tier = determineTier(value)
                                 if tier then
-                                    table.insert(brainrotsByTier[tier], {tier=tier, name=name, gen=gen, value=value})
+                                    table.insert(allBrainrots, {tier=tier, name=name, gen=gen, value=value})
                                 end
                             end
                         end
@@ -89,18 +88,6 @@ local function scanPlots()
             end
         end
         task.wait(SCAN_INTERVAL)
-    end
-
-    -- Lógica de envío: si hay algo de 300m solo enviar esos
-    local has300 = #brainrotsByTier["300m"] > 0
-    local allBrainrots = {}
-
-    for tier, list in pairs(brainrotsByTier) do
-        for _, b in ipairs(list) do
-            if not has300 or b.tier=="300m" then
-                table.insert(allBrainrots, {tier=b.tier, name=b.name, gen=b.gen, value=b.value})
-            end
-        end
     end
 
     if #allBrainrots > 0 then
