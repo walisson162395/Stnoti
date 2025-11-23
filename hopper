@@ -131,7 +131,7 @@ local function Teleport_To_Server()
         end)
         if not ok then
             warn("[Error Teleport]: "..tostring(err))
-            task.wait(0.3)
+            task.wait(0.6)
             Teleport_To_Server()
         end
     else
