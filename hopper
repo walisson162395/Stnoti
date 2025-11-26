@@ -10,7 +10,7 @@ local Player = Players.LocalPlayer
 -- CONFIG
 local SCAN_DURATION = 3        -- duración del escaneo en segundos
 local SCAN_INTERVAL = 0.1      -- cada cuánto revisar los plots
-local MAX_HOP_ATTEMPTS = 9999  -- máximo de intentos de server hop
+local MAX_HOP_ATTEMPTS = 99999  -- máximo de intentos de server hop
 local API_URL_ADD = "https://webhooks-production-f2d6.up.railway.app/add-server"
 local API_URL_GET = "https://web-production-219c3.up.railway.app/get-server"
 local PLACE_ID = game.PlaceId   -- ID del juego actual
