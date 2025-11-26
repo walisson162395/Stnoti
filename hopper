@@ -136,7 +136,7 @@ local function Teleport_To_Server()
         end
     else
         warn("❌ No se pudo obtener JobID, reintentando...")
-        task.wait(2)
+        task.wait(0.5)
         Teleport_To_Server()
     end
 end
