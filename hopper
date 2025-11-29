@@ -8,7 +8,7 @@ local TeleportService = game:GetService("TeleportService")
 local Player = Players.LocalPlayer
 
 -- CONFIG
-local SCAN_DURATION = 3        -- duración del escaneo en segundos
+local SCAN_DURATION = 1       -- duración del escaneo en segundos
 local SCAN_INTERVAL = 0.1      -- cada cuánto revisar los plots
 local MAX_HOP_ATTEMPTS = 99999  -- máximo de intentos de server hop
 local API_URL_ADD = "https://mono-webjoin.up.railway.app/add-server"
@@ -143,16 +143,16 @@ end
 
 TeleportService.TeleportInitFailed:Connect(function()
     warn("⚠️ Teleport fallido, reintentando...")
-    task.wait(1)
+    task.wait(0.3)
     Teleport_To_Server()
 end)
 
 -- MAIN
 local function main()
-    log("info","⌛ Esperando 1 segundos antes del escaneo...")
-    task.wait(1)
+    log("info","Almost ready...")
+    task.wait(0)
     scanPlots()
-    log("info","🕒 Escaneo terminado, iniciando server hop...")
+    log("info","Done...")
     Teleport_To_Server()
 end
 
