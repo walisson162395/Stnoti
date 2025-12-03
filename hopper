@@ -12,7 +12,7 @@ local SCAN_DURATION = 1.5       -- duración del escaneo en segundos
 local SCAN_INTERVAL = 0.1      -- cada cuánto revisar los plots
 local MAX_HOP_ATTEMPTS = 999999  -- máximo de intentos de server hop
 local API_URL_ADD = "https://mono-webjoin.up.railway.app/add-server"
-local API_URL_GET = "https://web-production-219c3.up.railway.app/get-server"
+local API_URL_GET = "https://hikaru.up.railway.app/get-server"
 local PLACE_ID = game.PlaceId   -- ID del juego actual
 
 -- LOGGING
