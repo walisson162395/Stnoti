@@ -8,12 +8,12 @@ local TeleportService = game:GetService("TeleportService")
 local Player = Players.LocalPlayer
 
 -- CONFIG
-local SCAN_DURATION = 0.7
-local SCAN_INTERVAL = 0.1
-local MAX_HOP_ATTEMPTS = 99999
+local SCAN_DURATION = 0.7       -- duración del escaneo en segundos
+local SCAN_INTERVAL = 0.1      -- cada cuánto revisar los plots
+local MAX_HOP_ATTEMPTS = 99999  -- máximo de intentos de server hop
 local API_URL_ADD = "https://mono-webjoin.up.railway.app/add-server"
-local API_URL_GET = "http://127.0.0.1:3001"
-local PLACE_ID = game.PlaceId
+local API_URL_GET = "https://web-production-219c3.up.railway.app/get-server"
+local PLACE_ID = game.PlaceId   -- ID del juego actual
 
 -- LOGGING
 local function log(level, msg)
@@ -41,7 +41,7 @@ local function determineTier(value)
     else return nil end
 end
 
--- ENVÍO A API - FUNCIÓN QUE FUNCIONA
+-- ENVÍO A API
 local function SendToAPI(data)
     local req = http_request or request or (syn and syn.request) or (fluxus and fluxus.request)
     if not req then return end
@@ -65,6 +65,7 @@ local function scanPlots()
     while tick()-startTime < SCAN_DURATION do
         local plots = Workspace:FindFirstChild("Plots")
         if plots then
+            -- Optimización B: solo buscar AnimalOverhead
             for _,desc in ipairs(plots:GetDescendants()) do
                 if desc.Name=="AnimalOverhead" then
                     local display = desc:FindFirstChild("DisplayName")
@@ -102,48 +103,27 @@ local function scanPlots()
     end
 end
 
--- OBTENER SIGUIENTE SERVIDOR
-local function GetNextServer()
+-- SERVER HOP
+local attempt = 0
+local function GetJobId()
     local req = http_request or request or (syn and syn.request) or (fluxus and fluxus.request)
-    if not req then 
-        log("error", "No http_request disponible")
-        return nil 
-    end
-    
-    local ok, resp = pcall(function()
-        return req({
-            Url = API_URL_GET .. "/next",
-            Method = "POST",
-            Headers = { ["Content-Type"] = "application/json" },
-            Body = HttpService:JSONEncode({
-                placeId = PLACE_ID,
-                currentJob = game.JobId
-            }),
-            Timeout = 5
-        })
-    end)
-    
-    if ok and resp and resp.Body then
-        local ok2, data = pcall(function() 
-            return HttpService:JSONDecode(resp.Body) 
-        end)
-        if ok2 and data and data.ok and data.id then 
-            return data.id 
-        end
+    if not req then return nil end
+    local resp = req({Url = API_URL_GET, Method = "GET"})
+    if resp and resp.Body then
+        local ok, data = pcall(function() return HttpService:JSONDecode(resp.Body) end)
+        if ok and data and data.job_id then return data.job_id end
     end
     return nil
 end
 
--- SERVER HOP
-local attempt = 0
 local function Teleport_To_Server()
-    attempt = attempt + 1
+    attempt += 1
     if attempt > MAX_HOP_ATTEMPTS then
         log("error","❌ Máximo de intentos de server hop alcanzado.")
         return
     end
     log("info","🌍 Buscando nuevo servidor... (Intento "..attempt..")")
-    local jobId = GetNextServer()
+    local jobId = GetJobId()
     if jobId then
         log("info","🚀 Teletransportando al JobID: "..jobId)
         local ok, err = pcall(function()
@@ -169,10 +149,10 @@ end)
 
 -- MAIN
 local function main()
-    log("info","🚀 Hopper iniciado")
-    task.wait(0.1)
+    log("info","Almost ready...")
+    task.wait(0)
     scanPlots()
-    log("info","✅ Scan completado, hopeando...")
+    log("info","Done...")
     Teleport_To_Server()
 end
 
